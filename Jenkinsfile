@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+environment {
+    AWS_REGION = 'ap-southeast-1'
+    AWS_ACCOUNT_ID = '808872801655'
+}
+
     tools {
         nodejs 'NodeJS'
     }
@@ -96,7 +101,38 @@ stage('Trivy Scan - Backend') {
         '''
     }
 }
+stage('Login to Amazon ECR') {
+    steps {
+        withCredentials([[
+            $class: 'AmazonWebServicesCredentialsBinding',
+            credentialsId: 'aws-ecr'
+        ]]) {
+            sh '''
+            aws ecr get-login-password --region $AWS_REGION | \
+            docker login --username AWS --password-stdin \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+            '''
+        }
+    }
+}
+stage('Tag Docker Images') {
+    steps {
+        sh '''
+        docker tag office-frontend:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/office-frontend:latest
 
+        docker tag office-backend:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/office-backend:latest
+        '''
+    }
+}
+stage('Push Images to ECR') {
+    steps {
+        sh '''
+        docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/office-frontend:latest
+
+        docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/office-backend:latest
+        '''
+    }
+}
 
 
 
