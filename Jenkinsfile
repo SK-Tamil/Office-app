@@ -7,6 +7,7 @@ environment {
 }
 
     tools {
+
         nodejs 'NodeJS'
     }
 
