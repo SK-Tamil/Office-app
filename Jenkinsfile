@@ -134,6 +134,48 @@ stage('Push Images to ECR') {
     }
 }
 
+stage('Deploy to Development') {
+    steps {
+        sh '''
+        echo "Deploying Application..."
+
+        # Stop old containers
+        docker stop office-frontend || true
+        docker rm office-frontend || true
+
+        docker stop office-backend || true
+        docker rm office-backend || true
+
+        # Pull latest images
+        docker pull ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/office-frontend:latest
+        docker pull ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/office-backend:latest
+
+        # Run Backend
+        docker run -d \
+        --name office-backend \
+        -p 5000:5000 \
+        ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/office-backend:latest
+
+        # Run Frontend
+        docker run -d \
+        --name office-frontend \
+        -p 3000:3000 \
+        ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/office-frontend:latest
+        '''
+    }
+}
+
+stage('Health Check') {
+    steps {
+        sh '''
+        echo "Waiting for application..."
+        sleep 20
+
+        curl http://localhost:3000
+        curl http://localhost:5000
+        '''
+    }
+}
 
 
 
