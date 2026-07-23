@@ -6,7 +6,7 @@ function App() {
   const [department, setDepartment] = useState("");
   const [email, setEmail] = useState("");
 
-  const API = "http://18.143.173.211:5000";
+  const API = "/api";
 
   const loadEmployees = async () => {
     try {
