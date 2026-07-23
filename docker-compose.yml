@@ -1,18 +1,16 @@
-version: '3.8'
+kversion: '3.8'
 
 services:
 
   office-backend:
-    build:
-      context: ./backend
+    image: 808872801655.dkr.ecr.ap-southeast-1.amazonaws.com/office-backend:latest
     container_name: office-backend
     ports:
       - "5000:5000"
     restart: always
 
   office-frontend:
-    build:
-      context: ./frontend
+    image: 808872801655.dkr.ecr.ap-southeast-1.amazonaws.com/office-frontend:latest
     container_name: office-frontend
     restart: always
 
