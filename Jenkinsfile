@@ -241,23 +241,168 @@ stage('Production Health Check') {
     post {
 
 always {
-        archiveArtifacts artifacts: 'reports/*', fingerprint: true
+        archiveArtifacts artifacts: 'docker-compose.yml,Jenkinsfile,nginx/**', fingerprint: true
+          cleanWs()
     }
         success {
-            echo 'Phase 1 Completed Successfully'
+            
+                 emailext(
+            subject: "✅ SUCCESS | ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+            mimeType: 'text/html',
+            body: """
+<html>
+<body style="font-family: Arial;">
+
+<h2 style="color:green;">Deployment Successful</h2>
+
+<table border="1" cellpadding="8" cellspacing="0">
+
+<tr>
+<th align="left">Project</th>
+<td>${env.JOB_NAME}</td>
+</tr>
+
+<tr>
+<th align="left">Build Number</th>
+<td>#${env.BUILD_NUMBER}</td>
+</tr>
+
+<tr>
+<th align="left">Status</th>
+<td><b style="color:green;">SUCCESS</b></td>
+</tr>
+
+<tr>
+<th align="left">Branch</th>
+<td>develop</td>
+</tr>
+
+<tr>
+<th align="left">Build URL</th>
+<td>
+<a href="${env.BUILD_URL}">
+${env.BUILD_URL}
+</a>
+</td>
+</tr>
+
+<tr>
+<th align="left">Time</th>
+<td>${new Date()}</td>
+</tr>
+
+</table>
+
+<br>
+
+<b>Pipeline Stages Completed</b>
+
+<ul>
+<li>Checkout</li>
+<li>Frontend Build</li>
+<li>Backend Build</li>
+<li>SonarQube Analysis</li>
+<li>Quality Gate</li>
+<li>Docker Build</li>
+<li>Trivy Scan</li>
+<li>Push to Amazon ECR</li>
+<li>Deploy Development</li>
+<li>Health Check</li>
+<li>Manual Approval</li>
+<li>Backup Production</li>
+<li>Deploy Production</li>
+<li>Production Health Check</li>
+</ul>
+
+<br>
+
+Regards,<br>
+
+<b>Jenkins CI/CD Pipeline</b>
+
+</body>
+</html>
+""",
+            to: "tamilselvanca20@nct.ac.in"
+        )
+      
         }
 
         failure {
              sh '''
-        echo "Deployment failed. Rolling back..."
+    echo "Deployment failed. Rolling back..."
 
-        docker compose down || true
+    docker compose down || true
 
-        docker tag office-frontend:backup office-frontend:latest || true
-        docker tag office-backend:backup office-backend:latest || true
+    docker tag office-frontend:backup $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/office-frontend:latest || true
+    docker tag office-backend:backup $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/office-backend:latest || true
 
-        docker compose up -d
-        '''
+    docker compose up -d
+    '''
+
+       emailext(
+            subject: "❌ FAILED | ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+            mimeType: 'text/html',
+            body: """
+<html>
+
+<body style="font-family:Arial;">
+
+<h2 style="color:red;">Deployment Failed</h2>
+
+<table border="1" cellpadding="8">
+
+<tr>
+<th align="left">Project</th>
+<td>${env.JOB_NAME}</td>
+</tr>
+
+<tr>
+<th align="left">Build</th>
+<td>#${env.BUILD_NUMBER}</td>
+</tr>
+
+<tr>
+<th align="left">Status</th>
+<td><b style="color:red;">FAILED</b></td>
+</tr>
+
+<tr>
+<th align="left">Build URL</th>
+<td>
+
+<a href="${env.BUILD_URL}">
+${env.BUILD_URL}
+</a>
+
+</td>
+</tr>
+
+<tr>
+<th align="left">Time</th>
+<td>${new Date()}</td>
+</tr>
+
+</table>
+
+<br>
+
+Please review the Jenkins console logs and resolve the issue.
+
+<br><br>
+
+Regards,
+
+<br>
+
+<b>Jenkins CI/CD Pipeline</b>
+
+</body>
+
+</html>
+""",
+            to: "tamilselvanca20@nct.ac.in"
+        )
         }
     }
 }
