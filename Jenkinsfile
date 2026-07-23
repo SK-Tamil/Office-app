@@ -55,9 +55,59 @@ stage('Quality Gate') {
     }
 }
 
+stage('Docker Build - Frontend') {
+    steps {
+        dir('frontend') {
+            sh '''
+            docker build -t office-frontend:latest .
+            '''
+        }
+    }
+}
+
+stage('Docker Build - Backend') {
+    steps {
+        dir('backend') {
+            sh '''
+            docker build -t office-backend:latest .
+            '''
+        }
+    }
+}
+
+stage('Verify Docker Images') {
+    steps {
+        sh 'docker images'
+    }
+}
+stage('Trivy Scan - Frontend') {
+    steps {
+        sh '''
+        mkdir -p reports
+        trivy image office-frontend:latest > reports/frontend-trivy-report.txt
+        '''
+    }
+}
+
+stage('Trivy Scan - Backend') {
+    steps {
+        sh '''
+        trivy image office-backend:latest > reports/backend-trivy-report.txt
+        '''
+    }
+}
+
+
+
+
+
     }
 
     post {
+
+always {
+        archiveArtifacts artifacts: 'reports/*', fingerprint: true
+    }
         success {
             echo 'Phase 1 Completed Successfully'
         }
