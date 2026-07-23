@@ -176,6 +176,24 @@ stage('Health Check') {
         '''
     }
 }
+stage('Manual Approval') {
+    steps {
+        input(
+            message: 'Deploy to Production?',
+            ok: 'Deploy'
+        )
+    }
+}stage('Backup Current Production') {
+    steps {
+        sh '''
+        docker tag ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/office-frontend:latest \
+        office-frontend:backup || true
+
+        docker tag ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/office-backend:latest \
+        office-backend:backup || true
+        '''
+    }
+}
 
 
 
