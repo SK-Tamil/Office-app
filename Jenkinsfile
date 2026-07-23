@@ -194,7 +194,47 @@ stage('Deploy to Development') {
     }
 }
 
+ stage('Deploy to Production') {
+    steps {
+        withCredentials([[
+            $class: 'AmazonWebServicesCredentialsBinding',
+            credentialsId: 'aws-ecr'
+        ]]) {
+            sh '''
+            echo "Deploying to Production..."
 
+            aws ecr get-login-password --region $AWS_REGION | \
+            docker login --username AWS --password-stdin \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+            docker compose down || true
+
+            docker rm -f office-frontend office-backend office-nginx || true
+
+            docker compose pull
+
+            docker compose up -d
+
+            echo "Production Deployment Successful"
+            '''
+        }
+    }
+}
+
+stage('Production Health Check') {
+    steps {
+        sh '''
+        echo "Waiting for application..."
+        sleep 20
+
+        curl -f http://localhost
+
+        curl -f http://localhost/api/employees
+
+        echo "Production Health Check Passed"
+        '''
+    }
+}
 
     }
 
@@ -208,7 +248,16 @@ always {
         }
 
         failure {
-            echo 'Phase 1 Failed'
+             sh '''
+        echo "Deployment failed. Rolling back..."
+
+        docker compose down || true
+
+        docker tag office-frontend:backup office-frontend:latest || true
+        docker tag office-backend:backup office-backend:latest || true
+
+        docker compose up -d
+        '''
         }
     }
 }
