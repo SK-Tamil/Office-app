@@ -136,43 +136,39 @@ stage('Push Images to ECR') {
 
 stage('Deploy to Development') {
     steps {
-        sh '''
-        echo "Deploying Application..."
+        withCredentials([[
+            $class: 'AmazonWebServicesCredentialsBinding',
+            credentialsId: 'aws-ecr'
+        ]]) {
+            sh '''
+            aws ecr get-login-password --region $AWS_REGION | \
+            docker login --username AWS --password-stdin \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-        # Stop old containers
-        docker stop office-frontend || true
-        docker rm office-frontend || true
+            docker compose down || true
 
-        docker stop office-backend || true
-        docker rm office-backend || true
+            docker compose pull
 
-        # Pull latest images
-        docker pull ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/office-frontend:latest
-        docker pull ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/office-backend:latest
-
-        # Run Backend
-        docker run -d \
-        --name office-backend \
-        -p 5000:5000 \
-        ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/office-backend:latest
-
-        # Run Frontend
-        docker run -d \
-        --name office-frontend \
-        -p 3000:3000 \
-        ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/office-frontend:latest
-        '''
+            docker compose up -d
+            '''
+        }
     }
 }
+
 
  stage('Health Check') {
     steps {
         sh '''
-        echo "Waiting for application..."
+        echo "Waiting for containers to start..."
         sleep 20
 
-        curl http://localhost:3000
-        curl http://localhost:5000
+        echo "Checking Nginx..."
+        curl -f http://localhost
+
+        echo "Checking Backend API..."
+        curl -f http://localhost/api/employees
+
+        echo "Health Check Passed!"
         '''
     }
 }
