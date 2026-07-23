@@ -165,7 +165,7 @@ stage('Deploy to Development') {
     }
 }
 
-stage('Health Check') {
+ stage('Health Check') {
     steps {
         sh '''
         echo "Waiting for application..."
@@ -176,14 +176,17 @@ stage('Health Check') {
         '''
     }
 }
-stage('Manual Approval') {
+
+  stage('Manual Approval') {
     steps {
         input(
             message: 'Deploy to Production?',
             ok: 'Deploy'
         )
     }
-}stage('Backup Current Production') {
+}
+
+    stage('Backup Current Production') {
     steps {
         sh '''
         docker tag ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/office-frontend:latest \
