@@ -333,12 +333,14 @@ Regards,<br>
              sh '''
     echo "Deployment failed. Rolling back..."
 
-    docker compose down || true
+    cd $WORKSPACE
 
-    docker tag office-frontend:backup $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/office-frontend:latest || true
-    docker tag office-backend:backup $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/office-backend:latest || true
+    docker compose -f docker-compose.yml down || true
 
-    docker compose up -d
+    docker tag office-frontend:backup office-frontend:latest || true
+    docker tag office-backend:backup office-backend:latest || true
+
+    docker compose -f docker-compose.yml up -d
     '''
 
        emailext(
