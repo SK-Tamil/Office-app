@@ -324,7 +324,7 @@ Regards,<br>
 </body>
 </html>
 """,
-            to: "tamilselvanca20@nct.ac.in"
+            to: "selven259@gmail.com"
         )
       
         }
@@ -402,7 +402,7 @@ Regards,
 
 </html>
 """,
-            to: "tamilselvanca20@nct.ac.in"
+            to: "selven259@gmail.com"
         )
         }
     }
