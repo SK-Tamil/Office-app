@@ -241,81 +241,116 @@ stage('Production Health Check') {
 
     post {
 
-always {
-        archiveArtifacts artifacts: 'docker-compose.yml,Jenkinsfile,nginx/**', fingerprint: true
-          cleanWs()
-    }
-        success {
-            
-                 emailext(
+    success {
+        echo "===== BUILD SUCCESS ====="
+
+        emailext(
+            to: 'stamilselvansk@gmail.com',
             subject: "✅ SUCCESS | ${env.JOB_NAME} #${env.BUILD_NUMBER}",
             mimeType: 'text/html',
             body: """
 <html>
-<body style="font-family: Arial;">
+<body style="font-family:Arial">
 
 <h2 style="color:green;">Deployment Successful</h2>
 
 <table border="1" cellpadding="8" cellspacing="0">
-
-<tr>
-<th align="left">Project</th>
-<td>${env.JOB_NAME}</td>
-</tr>
-
-<tr>
-<th align="left">Build Number</th>
-<td>#${env.BUILD_NUMBER}</td>
-</tr>
-
-<tr>
-<th align="left">Status</th>
-<td><b style="color:green;">SUCCESS</b></td>
-</tr>
-
-<tr>
-<th align="left">Branch</th>
-<td>develop</td>
-</tr>
-
-<tr>
-<th align="left">Build URL</th>
-<td>
-<a href="${env.BUILD_URL}">
-${env.BUILD_URL}
-</a>
-</td>
-</tr>
-
-<tr>
-<th align="left">Time</th>
-<td>${new Date()}</td>
-</tr>
-
+<tr><th align="left">Project</th><td>${env.JOB_NAME}</td></tr>
+<tr><th align="left">Build Number</th><td>#${env.BUILD_NUMBER}</td></tr>
+<tr><th align="left">Status</th><td><b style="color:green;">SUCCESS</b></td></tr>
+<tr><th align="left">Branch</th><td>develop</td></tr>
+<tr><th align="left">Build URL</th><td><a href="${env.BUILD_URL}">${env.BUILD_URL}</a></td></tr>
+<tr><th align="left">Time</th><td>${new Date()}</td></tr>
 </table>
 
 <br>
 
-<b>Pipeline Stages Completed</b>
+<b>Pipeline Completed Successfully</b>
 
 <ul>
-<li>Checkout</li>
-<li>Frontend Build</li>
-<li>Backend Build</li>
-<li>SonarQube Analysis</li>
-<li>Quality Gate</li>
-<li>Docker Build</li>
-<li>Trivy Scan</li>
-<li>Push to Amazon ECR</li>
-<li>Deploy Development</li>
-<li>Health Check</li>
-<li>Manual Approval</li>
-<li>Backup Production</li>
-<li>Deploy Production</li>
-<li>Production Health Check</li>
+<li>✅ Source Checkout</li>
+<li>✅ SonarQube Analysis</li>
+<li>✅ Quality Gate</li>
+<li>✅ Frontend Build</li>
+<li>✅ Backend Build</li>
+<li>✅ Docker Image Build</li>
+<li>✅ Trivy Security Scan</li>
+<li>✅ Push Images to Amazon ECR</li>
+<li>✅ Development Deployment</li>
+<li>✅ Development Health Check</li>
+<li>✅ Manual Approval</li>
+<li>✅ Backup Current Production</li>
+<li>✅ Production Deployment</li>
+<li>✅ Production Health Check</li>
 </ul>
 
 <br>
+
+Regards,<br>
+<b>Jenkins CI/CD Pipeline</b>
+
+</body>
+</html>
+"""
+        )
+
+        echo "===== SUCCESS EMAIL SENT ====="
+    }
+
+    failure {
+
+        echo "===== BUILD FAILED ====="
+
+        sh '''
+        echo "Deployment failed. Rolling back..."
+
+        cd /home/ubuntu/office-app
+
+        docker compose down || true
+
+        docker rm -f office-frontend office-backend office-nginx || true
+
+        docker tag office-frontend:backup office-frontend:latest || true
+        docker tag office-backend:backup office-backend:latest || true
+
+        docker compose up -d
+        '''
+
+        emailext(
+            to: 'stamilselvansk@gmail.com',
+            subject: "❌ FAILED | ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+            mimeType: 'text/html',
+            body: """
+<html>
+<body style="font-family:Arial">
+
+<h2 style="color:red;">Deployment Failed</h2>
+
+<table border="1" cellpadding="8" cellspacing="0">
+<tr><th align="left">Project</th><td>${env.JOB_NAME}</td></tr>
+<tr><th align="left">Build Number</th><td>#${env.BUILD_NUMBER}</td></tr>
+<tr><th align="left">Status</th><td><b style="color:red;">FAILED</b></td></tr>
+<tr><th align="left">Rollback</th><td>Completed Successfully</td></tr>
+<tr><th align="left">Build URL</th><td><a href="${env.BUILD_URL}">${env.BUILD_URL}</a></td></tr>
+<tr><th align="left">Time</th><td>${new Date()}</td></tr>
+</table>
+
+<br>
+
+<b>Rollback Actions</b>
+
+<ul>
+<li>Stopped Docker Compose Stack</li>
+<li>Removed Existing Containers</li>
+<li>Restored Backup Images</li>
+<li>Started Previous Stable Version</li>
+</ul>
+
+<br>
+
+Please review the Jenkins console log for the root cause.
+
+<br><br>
 
 Regards,<br>
 
@@ -323,96 +358,26 @@ Regards,<br>
 
 </body>
 </html>
-""",
-            to: "stamilselvansk@gmail.com"
+"""
         )
-      
-        }
 
-        failure {
-               sh '''
-    echo "Deployment failed. Rolling back..."
+        echo "===== FAILURE EMAIL SENT ====="
+    }
 
-    cd /home/ubuntu/office-app
+    always {
 
-    # Stop compose stack
-    docker compose down || true
+        echo "===== ARCHIVING ARTIFACTS ====="
 
-    # Remove old containers if they still exist
-    docker rm -f office-frontend office-backend office-nginx || true
-
-    # Restore backup images
-    docker tag office-frontend:backup office-frontend:latest || true
-    docker tag office-backend:backup office-backend:latest || true
-
-    # Start application
-    docker compose up -d
-    '''
-
-       emailext(
-            subject: "❌ FAILED | ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-            mimeType: 'text/html',
-            body: """
-<html>
-
-<body style="font-family:Arial;">
-
-<h2 style="color:red;">Deployment Failed</h2>
-
-<table border="1" cellpadding="8">
-
-<tr>
-<th align="left">Project</th>
-<td>${env.JOB_NAME}</td>
-</tr>
-
-<tr>
-<th align="left">Build</th>
-<td>#${env.BUILD_NUMBER}</td>
-</tr>
-
-<tr>
-<th align="left">Status</th>
-<td><b style="color:red;">FAILED</b></td>
-</tr>
-
-<tr>
-<th align="left">Build URL</th>
-<td>
-
-<a href="${env.BUILD_URL}">
-${env.BUILD_URL}
-</a>
-
-</td>
-</tr>
-
-<tr>
-<th align="left">Time</th>
-<td>${new Date()}</td>
-</tr>
-
-</table>
-
-<br>
-
-Please review the Jenkins console logs and resolve the issue.
-
-<br><br>
-
-Regards,
-
-
-<br>
-
-<b>Jenkins CI/CD Pipeline</b>
-
-</body>
-
-</html>
-""",
-            to: "stamilselvansk@gmail.com"
+        archiveArtifacts(
+            artifacts: 'docker-compose.yml,Jenkinsfile,nginx/**',
+            fingerprint: true
         )
-        }
+    }
+
+    cleanup {
+
+        echo "===== CLEANING WORKSPACE ====="
+
+        cleanWs()
     }
 }
