@@ -330,16 +330,22 @@ Regards,<br>
         }
 
         failure {
-              sh '''
+               sh '''
     echo "Deployment failed. Rolling back..."
 
     cd /home/ubuntu/office-app
 
+    # Stop compose stack
     docker compose down || true
 
+    # Remove old containers if they still exist
+    docker rm -f office-frontend office-backend office-nginx || true
+
+    # Restore backup images
     docker tag office-frontend:backup office-frontend:latest || true
     docker tag office-backend:backup office-backend:latest || true
 
+    # Start application
     docker compose up -d
     '''
 
