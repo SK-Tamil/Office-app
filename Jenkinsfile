@@ -4,6 +4,7 @@ pipeline {
 environment {
     AWS_REGION = 'ap-southeast-1'
     AWS_ACCOUNT_ID = '808872801655'
+    TZ_ZONE = 'Asia/Kolkata'
 }
 
     tools {
@@ -240,33 +241,30 @@ stage('Production Health Check') {
     }
 
     post {
-
-    success {
-        echo "===== BUILD SUCCESS ====="
-
-        emailext(
-            to: 'stamilselvansk@gmail.com',
-            subject: "✅ SUCCESS | ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-            mimeType: 'text/html',
-            body: """
+        success {
+            script {
+                env.BUILD_TIME = new Date().format("yyyy-MM-dd HH:mm:ss z", TimeZone.getTimeZone(env.TZ_ZONE))
+                env.BRANCH_DISPLAY = env.GIT_BRANCH ?: env.BRANCH_NAME ?: 'unknown'
+            }
+            echo "===== BUILD SUCCESS ====="
+            emailext(
+                to: 'stamilselvansk@gmail.com',
+                subject: "✅ SUCCESS | ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                mimeType: 'text/html',
+                body: """
 <html>
 <body style="font-family:Arial">
-
 <h2 style="color:green;">Deployment Successful</h2>
-
 <table border="1" cellpadding="8" cellspacing="0">
 <tr><th align="left">Project</th><td>${env.JOB_NAME}</td></tr>
 <tr><th align="left">Build Number</th><td>#${env.BUILD_NUMBER}</td></tr>
 <tr><th align="left">Status</th><td><b style="color:green;">SUCCESS</b></td></tr>
-<tr><th align="left">Branch</th><td>develop</td></tr>
+<tr><th align="left">Branch</th><td>${env.BRANCH_DISPLAY}</td></tr>
 <tr><th align="left">Build URL</th><td><a href="${env.BUILD_URL}">${env.BUILD_URL}</a></td></tr>
-<tr><th align="left">Time</th><td>${new Date()}</td></tr>
+<tr><th align="left">Time</th><td>${env.BUILD_TIME}</td></tr>
 </table>
-
 <br>
-
 <b>Pipeline Completed Successfully</b>
-
 <ul>
 <li>✅ Source Checkout</li>
 <li>✅ SonarQube Analysis</li>
@@ -283,102 +281,120 @@ stage('Production Health Check') {
 <li>✅ Production Deployment</li>
 <li>✅ Production Health Check</li>
 </ul>
-
 <br>
-
 Regards,<br>
 <b>Jenkins CI/CD Pipeline</b>
-
 </body>
 </html>
 """
-        )
+            )
+            echo "===== SUCCESS EMAIL SENT ====="
+        }
 
-        echo "===== SUCCESS EMAIL SENT ====="
-    }
-
-    failure {
-
-        echo "===== BUILD FAILED ====="
-
-        sh '''
-        echo "Deployment failed. Rolling back..."
-
-        cd /home/ubuntu/office-app
-
-        docker compose down || true
-
-        docker rm -f office-frontend office-backend office-nginx || true
-
-        docker tag office-frontend:backup office-frontend:latest || true
-        docker tag office-backend:backup office-backend:latest || true
-
-        docker compose up -d
-        '''
-
-        emailext(
-            to: 'stamilselvansk@gmail.com',
-            subject: "❌ FAILED | ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-            mimeType: 'text/html',
-            body: """
+        failure {
+            script {
+                env.BUILD_TIME = new Date().format("yyyy-MM-dd HH:mm:ss z", TimeZone.getTimeZone(env.TZ_ZONE))
+                env.BRANCH_DISPLAY = env.GIT_BRANCH ?: env.BRANCH_NAME ?: 'unknown'
+                echo "===== BUILD FAILED — ATTEMPTING ROLLBACK ====="
+                def rollbackOk = true
+                try {
+                    sh '''
+                        set -e
+                        cd /home/ubuntu/office-app
+                        docker compose down
+                        docker rm -f office-frontend office-backend office-nginx || true
+                        docker tag office-frontend:backup office-frontend:latest
+                        docker tag office-backend:backup office-backend:latest
+                        docker compose up -d
+                    '''
+                } catch (e) {
+                    rollbackOk = false
+                    echo "Rollback failed: ${e.getMessage()}"
+                }
+                env.ROLLBACK_STATUS = rollbackOk ? "Completed Successfully" : "FAILED — manual intervention required"
+                env.ROLLBACK_COLOR  = rollbackOk ? "green" : "red"
+            }
+            emailext(
+                to: 'stamilselvansk@gmail.com',
+                subject: "❌ FAILED | ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                mimeType: 'text/html',
+                body: """
 <html>
 <body style="font-family:Arial">
-
 <h2 style="color:red;">Deployment Failed</h2>
-
 <table border="1" cellpadding="8" cellspacing="0">
 <tr><th align="left">Project</th><td>${env.JOB_NAME}</td></tr>
 <tr><th align="left">Build Number</th><td>#${env.BUILD_NUMBER}</td></tr>
 <tr><th align="left">Status</th><td><b style="color:red;">FAILED</b></td></tr>
-<tr><th align="left">Rollback</th><td>Completed Successfully</td></tr>
+<tr><th align="left">Branch</th><td>${env.BRANCH_DISPLAY}</td></tr>
+<tr><th align="left">Rollback</th><td><b style="color:${env.ROLLBACK_COLOR};">${env.ROLLBACK_STATUS}</b></td></tr>
 <tr><th align="left">Build URL</th><td><a href="${env.BUILD_URL}">${env.BUILD_URL}</a></td></tr>
-<tr><th align="left">Time</th><td>${new Date()}</td></tr>
+<tr><th align="left">Time</th><td>${env.BUILD_TIME}</td></tr>
 </table>
-
 <br>
-
-<b>Rollback Actions</b>
-
+<b>Rollback Actions Attempted</b>
 <ul>
 <li>Stopped Docker Compose Stack</li>
 <li>Removed Existing Containers</li>
 <li>Restored Backup Images</li>
 <li>Started Previous Stable Version</li>
 </ul>
-
 <br>
-
 Please review the Jenkins console log for the root cause.
-
 <br><br>
-
 Regards,<br>
-
 <b>Jenkins CI/CD Pipeline</b>
-
 </body>
 </html>
 """
-        )
+            )
+            echo "===== FAILURE EMAIL SENT ====="
+        }
 
-        echo "===== FAILURE EMAIL SENT ====="
+        unstable {
+            script {
+                env.BUILD_TIME = new Date().format("yyyy-MM-dd HH:mm:ss z", TimeZone.getTimeZone(env.TZ_ZONE))
+                env.BRANCH_DISPLAY = env.GIT_BRANCH ?: env.BRANCH_NAME ?: 'unknown'
+            }
+            echo "===== BUILD UNSTABLE ====="
+            emailext(
+                to: 'stamilselvansk@gmail.com',
+                subject: "⚠️ UNSTABLE | ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                mimeType: 'text/html',
+                body: """
+<html>
+<body style="font-family:Arial">
+<h2 style="color:orange;">Build Marked Unstable</h2>
+<table border="1" cellpadding="8" cellspacing="0">
+<tr><th align="left">Project</th><td>${env.JOB_NAME}</td></tr>
+<tr><th align="left">Build Number</th><td>#${env.BUILD_NUMBER}</td></tr>
+<tr><th align="left">Status</th><td><b style="color:orange;">UNSTABLE</b></td></tr>
+<tr><th align="left">Branch</th><td>${env.BRANCH_DISPLAY}</td></tr>
+<tr><th align="left">Build URL</th><td><a href="${env.BUILD_URL}">${env.BUILD_URL}</a></td></tr>
+<tr><th align="left">Time</th><td>${env.BUILD_TIME}</td></tr>
+</table>
+<br>
+Likely cause: Quality Gate or a test/scan stage did not pass cleanly. No rollback was triggered — please review manually.
+<br><br>
+Regards,<br>
+<b>Jenkins CI/CD Pipeline</b>
+</body>
+</html>
+"""
+            )
+        }
+
+        always {
+            echo "===== ARCHIVING ARTIFACTS ====="
+            archiveArtifacts(
+                artifacts: 'docker-compose.yml,Jenkinsfile,nginx/**',
+                fingerprint: true
+            )
+        }
+
+        cleanup {
+            echo "===== CLEANING WORKSPACE ====="
+            cleanWs()
+        }
     }
-
-    always {
-
-        echo "===== ARCHIVING ARTIFACTS ====="
-
-        archiveArtifacts(
-            artifacts: 'docker-compose.yml,Jenkinsfile,nginx/**',
-            fingerprint: true
-        )
-    }
-
-    cleanup {
-
-        echo "===== CLEANING WORKSPACE ====="
-
-        cleanWs()
-    }
-}
 }
