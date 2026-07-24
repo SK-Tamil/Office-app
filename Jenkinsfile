@@ -333,14 +333,14 @@ Regards,<br>
              sh '''
     echo "Deployment failed. Rolling back..."
 
-    cd $WORKSPACE
+    cd /home/ubuntu/office-app
 
-    docker compose -f docker-compose.yml down || true
+    docker compose down || true
 
     docker tag office-frontend:backup office-frontend:latest || true
     docker tag office-backend:backup office-backend:latest || true
 
-    docker compose -f docker-compose.yml up -d
+    docker compose up -d
     '''
 
        emailext(
