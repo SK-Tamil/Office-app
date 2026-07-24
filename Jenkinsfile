@@ -324,13 +324,13 @@ Regards,<br>
 </body>
 </html>
 """,
-            to: "selven259@gmail.com"
+            to: "stamilselvansk@gmail.com"
         )
       
         }
 
         failure {
-             sh '''
+              sh '''
     echo "Deployment failed. Rolling back..."
 
     cd /home/ubuntu/office-app
@@ -405,7 +405,7 @@ Regards,
 
 </html>
 """,
-            to: "selven259@gmail.com"
+            to: "stamilselvansk@gmail.com"
         )
         }
     }
